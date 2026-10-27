@@ -1,0 +1,5 @@
+# Captures and logs may contain personal data (prefixes, DUID, MAC)
+*.pcap
+*.pcapng
+*.log
+v6watch.prefix

@@ -1,0 +1,2 @@
+# The scripts run on BusyBox sh: keep LF line endings, also on Windows
+* text=auto eol=lf
