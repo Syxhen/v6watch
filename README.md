@@ -64,14 +64,17 @@ Reports from other models and connection types are welcome.
 
 ## Install
 
-Over SSH on the router:
+Over SSH on the router, to install the latest release:
 
 ```sh
-cd /tmp
-curl -fsSL https://github.com/Syxhen/v6watch/archive/refs/heads/main.tar.gz | tar xz
-sh v6watch-main/install.sh
-rm -rf v6watch-main
+cd /tmp && rm -rf v6watch
+curl -fsSL https://github.com/Syxhen/v6watch/releases/latest/download/v6watch.tar.gz | tar xz
+sh v6watch/install.sh
+rm -rf v6watch
 ```
+
+The same commands upgrade an existing installation. A specific version is at
+`https://github.com/Syxhen/v6watch/releases/download/v0.1.0/v6watch.tar.gz`.
 
 The installer:
 

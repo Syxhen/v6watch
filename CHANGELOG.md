@@ -9,6 +9,12 @@ All notable changes to this project are documented here. The format follows
 ### Added
 - The installer warns when Dual WAN is enabled; the README explains why
   v6watch and Dual WAN (e.g. the WAN Failover add-on) get in each other's way.
+- Every release comes with a `v6watch.tar.gz` archive, built and attached by
+  GitHub Actions when a version tag is pushed.
+
+### Changed
+- The README installs the latest release instead of the `main` branch, so
+  unreleased changes no longer reach users.
 
 ## [0.1.0] - 2026-10-28
 

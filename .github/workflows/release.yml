@@ -1,0 +1,60 @@
+name: Release
+
+# Pushing a v* tag builds v6watch.tar.gz and publishes it as a release asset,
+# so the README can always download
+# https://github.com/Syxhen/v6watch/releases/latest/download/v6watch.tar.gz
+# Run it by hand to (re)attach the archive to an existing tag.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build the archive for (e.g. v0.1.0)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Check that the tag matches the script version
+        run: |
+          version=$(sed -n 's/^VERSION=//p' v6watch.sh)
+          if [ "v$version" != "$TAG" ]; then
+            echo "v6watch.sh says $version but the tag is $TAG" >&2
+            exit 1
+          fi
+
+      - name: Build the archive
+        run: |
+          mkdir v6watch
+          cp v6watch.sh v6watch.conf install.sh uninstall.sh README.md LICENSE CHANGELOG.md v6watch/
+          chmod 755 v6watch/*.sh
+          # ustar keeps the archive readable by BusyBox tar
+          tar --format=ustar --owner=0 --group=0 -czf v6watch.tar.gz v6watch
+
+      - name: Extract the release notes from CHANGELOG.md
+        run: |
+          awk -v v="${TAG#v}" 'index($0, "## [" v "]") == 1 {f = 1; next} /^## \[/ {f = 0} f' CHANGELOG.md > notes.md
+          cat notes.md
+
+      - name: Publish
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" v6watch.tar.gz --clobber
+          else
+            gh release create "$TAG" v6watch.tar.gz --verify-tag \
+              --title "v6watch ${TAG#v}" --notes-file notes.md
+          fi
