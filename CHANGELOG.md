@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- The installer warns when Dual WAN is enabled; the README explains why
+  v6watch and Dual WAN (e.g. the WAN Failover add-on) get in each other's way.
+
 ## [0.1.0] - 2026-10-28
 
 First public version.
@@ -27,4 +33,5 @@ First public version.
   ISP.
 - ShellCheck on every push (GitHub Actions).
 
+[Unreleased]: https://github.com/Syxhen/v6watch/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/Syxhen/v6watch/releases/tag/v0.1.0

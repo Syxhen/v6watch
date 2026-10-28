@@ -41,6 +41,11 @@ done
 [ "$(nvram get ipv6_service)" = disabled ] && warn "IPv6 is disabled in the router settings"
 pidof odhcp6c >/dev/null 2>&1 ||
   warn "odhcp6c is not running: v6watch needs native IPv6 with DHCPv6 prefix delegation"
+# wans_dualwan is "wan none" on single-WAN setups
+case $(nvram get wans_dualwan) in
+  ''|*none*) ;;
+  *) warn "Dual WAN is enabled: v6watch is meant for single-WAN setups, its WAN restarts trigger a failover (see Limitations in the README)" ;;
+esac
 
 # Files
 mkdir -p "$ADDON_DIR" || die "cannot create $ADDON_DIR"

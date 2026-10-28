@@ -185,7 +185,13 @@ Only the v6watch line is removed from `/jffs/scripts/services-start`.
   restarts the WAN, at most once per `RESTART_MIN_INTERVAL`.
 - Only the main LAN is checked; guest networks on other /64s of the same
   delegated prefix are not.
-- Dual WAN and PPPoE have not been tested.
+- v6watch is meant for single-WAN setups, and the installer warns when Dual
+  WAN is enabled. With Dual WAN, for example with the WAN Failover add-on,
+  the two get in each other's way: a v6watch WAN restart looks like a failure
+  of the primary WAN and triggers a failover, and while traffic leaves through
+  the secondary WAN the primary ISP's delegated prefix is not routed, so
+  v6watch would report it as dead and restart the WAN.
+- PPPoE has not been tested.
 
 ## Roadmap
 
