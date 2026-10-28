@@ -160,6 +160,15 @@ grep -nE 'dhcp-range|ra-param' /etc/dnsmasq.conf
 A line like `ra-param=br0,10,600` means an RA every 10 seconds and a prefix
 valid for 10 minutes: devices abandon the old prefix within 10 minutes.
 
+## A new prefix after every WAN restart?
+
+Some ISPs hand out a different delegated prefix at every DHCPv6 Solicit, even
+when the router keeps the same DUID and IAID and sends no Release. That is the
+ISP's behaviour, not v6watch's: v6watch only triggers the restart. If your
+contract promises a static prefix, `LAN prefix changed` entries with a high
+router uptime in the log, together with the captures described in
+[docs/isp-evidence.md](docs/isp-evidence.md), are what to send to your ISP.
+
 ## Uninstall
 
 ```sh
