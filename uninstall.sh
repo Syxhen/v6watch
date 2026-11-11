@@ -18,7 +18,7 @@ esac
 
 cru d v6watch 2>/dev/null
 [ -f "$HOOK" ] && sed -i '/# v6watch$/d' "$HOOK"
-rm -rf /tmp/v6watch.lock /tmp/v6watch.last /tmp/v6watch.fail
+rm -rf /tmp/v6watch.lock /tmp/v6watch.last /tmp/v6watch.fail /tmp/v6watch.count /tmp/v6watch.tries
 
 if [ "$1" = --keep-log ] && [ -f "$ADDON_DIR/v6watch.log" ]; then
   for f in "$ADDON_DIR"/*; do

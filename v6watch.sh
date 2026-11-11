@@ -3,7 +3,8 @@
 #
 # Checks that the delegated IPv6 prefix (DHCPv6-PD) used on the LAN is really
 # routed upstream. If it is not, it first asks odhcp6c for a DHCPv6 renew and,
-# if that does not help, restarts the WAN (rate limited). Prefix changes,
+# if the prefix is still dead at the following checks, restarts the WAN (rate
+# limited, less and less often while restarts do not help). Prefix changes,
 # failures and a daily check go to syslog and to a persistent log on /jffs.
 #
 # Usage: v6watch.sh [run|check|cron|uncron|version]
@@ -22,6 +23,8 @@ CONF=${V6WATCH_CONF:-$ADDON_DIR/v6watch.conf}
 # Runtime state, kept in RAM
 STAMP_FILE=/tmp/v6watch.last   # time of the last WAN restart
 FAIL_FILE=/tmp/v6watch.fail    # start time of the current outage
+COUNT_FILE=/tmp/v6watch.count  # consecutive failed checks of the current outage
+TRIES_FILE=/tmp/v6watch.tries  # WAN restarts of the current outage
 LOCK_DIR=/tmp/v6watch.lock
 
 # Defaults; override them in $CONF
@@ -31,7 +34,10 @@ PING_COUNT=2
 PING_TIMEOUT=3
 RENEW_WAIT=30
 RESTART_WAIT=90
+FAIL_THRESHOLD=2
 RESTART_MIN_INTERVAL=3600
+RESTART_MAX_INTERVAL=86400
+RESTART_ON_WAN_FAIL=1
 DAILY_CHECK=1200
 CRON_SCHEDULE="*/5 * * * *"
 LOG_FILE=$ADDON_DIR/v6watch.log
@@ -90,13 +96,31 @@ routed() {
   return 1
 }
 
-# Tells a dead delegated prefix apart from a general IPv6 outage
+# Tells a dead delegated prefix apart from a general IPv6 outage.
+# Returns 0 if the WAN address works, 1 if it fails too, 2 if there is none to test
 wan_status() {
   w=$(wan_if)
-  if [ -z "$w" ]; then echo "no IPv6 default route"; return; fi
+  if [ -z "$w" ]; then echo "no IPv6 default route"; return 2; fi
   a=$(global_addr "$w")
-  if [ -z "$a" ]; then echo "no global address on $w"; return; fi
-  if routed "$a"; then echo "WAN address $a works"; else echo "WAN address $a fails too"; fi
+  if [ -z "$a" ]; then echo "no global address on $w"; return 2; fi
+  if routed "$a"; then echo "WAN address $a works"; return 0; fi
+  echo "WAN address $a fails too"
+  return 1
+}
+
+# Seconds that must pass after the last WAN restart before the next one:
+# RESTART_MIN_INTERVAL, doubled for every restart of the current outage ($1)
+# after the first, up to RESTART_MAX_INTERVAL
+restart_interval() {
+  n=$1
+  i=$RESTART_MIN_INTERVAL
+  while [ "$n" -gt 1 ] && [ "$i" -lt "$RESTART_MAX_INTERVAL" ]; do
+    i=$((i * 2))
+    n=$((n - 1))
+  done
+  [ "$i" -gt "$RESTART_MAX_INTERVAL" ] && i=$RESTART_MAX_INTERVAL
+  [ "$i" -lt "$RESTART_MIN_INTERVAL" ] && i=$RESTART_MIN_INTERVAL
+  echo "$i"
 }
 
 # Reads a number of seconds from a file, 0 if missing or invalid
@@ -123,33 +147,41 @@ recovered() {
   if [ -f "$FAIL_FILE" ]; then
     start=$(read_time "$FAIL_FILE")
     end=$(date +%s)
-    rm -f "$FAIL_FILE"
+    rm -f "$FAIL_FILE" "$COUNT_FILE" "$TRIES_FILE"
     log "$1 (outage lasted $(( (end - start) / 60 )) min)"
   fi
 }
 
 cmd_run() {
   lock
-  src=$(global_addr "$LAN_IF")
-  [ -z "$src" ] && exit 0
   up=$(uptime_h)
+  old=$(cat "$STATE_FILE" 2>/dev/null)   # last seen LAN address, if any
+  src=$(global_addr "$LAN_IF")
 
-  old=$(cat "$STATE_FILE" 2>/dev/null)
-  if [ "$src" != "$old" ]; then
-    if [ -n "$old" ]; then
-      log "LAN prefix changed: $old -> $src (router uptime $up)"
-    else
-      log "Watching LAN prefix: $src (router uptime $up)"
+  if [ -n "$src" ]; then
+    if [ "$src" != "$old" ]; then
+      if [ -n "$old" ]; then
+        log "LAN prefix changed: $old -> $src (router uptime $up)"
+      else
+        log "Watching LAN prefix: $src (router uptime $up)"
+      fi
+      echo "$src" > "$STATE_FILE"
+      old=$src
     fi
-    echo "$src" > "$STATE_FILE"
-  fi
 
-  if routed "$src"; then
-    recovered "Prefix of $src routed again"
-    if [ -n "$DAILY_CHECK" ] && [ "$(date +%H%M)" = "$DAILY_CHECK" ]; then
-      log "Daily check: $src routed (router uptime $up)"
+    if routed "$src"; then
+      recovered "Prefix of $src routed again"
+      if [ -n "$DAILY_CHECK" ] && [ "$(date +%H%M)" = "$DAILY_CHECK" ]; then
+        log "Daily check: $src routed (router uptime $up)"
+      fi
+      exit 0
     fi
-    exit 0
+    what="Prefix of $src not routed"
+  else
+    # Without odhcp6c no delegated prefix is expected (IPv6 off, 6in4, ...);
+    # with it, a LAN left without a usable address is a failure like any other
+    pidof odhcp6c >/dev/null 2>&1 || exit 0
+    what="No usable global address on $LAN_IF"
   fi
 
   # Only the first failure of an outage is written to /jffs
@@ -159,18 +191,22 @@ cmd_run() {
     out=log
     date +%s > "$FAIL_FILE"
   fi
+  fails=$(( $(read_time "$COUNT_FILE") + 1 ))
+  echo "$fails" > "$COUNT_FILE"
 
-  "$out" "Prefix of $src not routed ($(wan_status)): trying a DHCPv6 renew"
+  wan=$(wan_status)
+  wan_rc=$?
+  "$out" "$what ($wan): trying a DHCPv6 renew"
   if pidof odhcp6c >/dev/null 2>&1; then
     killall -USR1 odhcp6c
     sleep "$RENEW_WAIT"
     cur=$(global_addr "$LAN_IF")
     if [ -n "$cur" ] && routed "$cur"; then
-      if [ "$cur" != "$src" ]; then
+      if [ "$cur" != "$old" ]; then
         echo "$cur" > "$STATE_FILE"
-        recovered "Renew brought a new prefix: $src -> $cur, routed"
+        recovered "Renew brought a new prefix: ${old:+$old -> }$cur, routed"
       else
-        recovered "Renew worked: $src routed again"
+        recovered "Renew worked: $cur routed again"
       fi
       exit 0
     fi
@@ -178,14 +214,28 @@ cmd_run() {
     "$out" "odhcp6c is not running, skipping the renew"
   fi
 
+  # A WAN restart also drops IPv4: not for a short glitch
+  if [ "$fails" -lt "$FAIL_THRESHOLD" ]; then
+    note "Still not routed (failed check $fails of $FAIL_THRESHOLD before a WAN restart)"
+    exit 0
+  fi
+
+  if [ "$wan_rc" -eq 1 ] && [ "$RESTART_ON_WAN_FAIL" != 1 ]; then
+    note "Still not routed; the WAN address fails too, not restarting the WAN"
+    exit 0
+  fi
+
   now=$(date +%s)
   last=$(read_time "$STAMP_FILE")
-  if [ $((now - last)) -lt "$RESTART_MIN_INTERVAL" ]; then
-    "$out" "Still not routed; last WAN restart $(( (now - last) / 60 )) min ago, waiting"
+  tries=$(read_time "$TRIES_FILE")
+  gap=$(restart_interval "$tries")
+  if [ $((now - last)) -lt "$gap" ]; then
+    note "Still not routed; last WAN restart $(( (now - last) / 60 )) min ago, the next one $((gap / 60)) min after it"
     exit 0
   fi
 
   echo "$now" > "$STAMP_FILE"
+  echo $((tries + 1)) > "$TRIES_FILE"
   log "Still not routed: restarting the WAN"
   service restart_wan
   sleep "$RESTART_WAIT"
@@ -195,9 +245,9 @@ cmd_run() {
     log "After the WAN restart: no global address on $LAN_IF"
     exit 0
   fi
-  if [ "$new" != "$src" ]; then
+  if [ "$new" != "$old" ]; then
     echo "$new" > "$STATE_FILE"
-    msg="After the WAN restart: new prefix $src -> $new"
+    msg="After the WAN restart: new prefix ${old:+$old -> }$new"
   else
     msg="After the WAN restart: same prefix $new"
   fi

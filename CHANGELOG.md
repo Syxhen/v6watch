@@ -11,8 +11,20 @@ All notable changes to this project are documented here. The format follows
   v6watch and Dual WAN (e.g. the WAN Failover add-on) get in each other's way.
 - Every release comes with a `v6watch.tar.gz` archive, built and attached by
   GitHub Actions when a version tag is pushed.
+- `RESTART_MAX_INTERVAL` (default one day): while WAN restarts do not bring
+  the prefix back, the wait between them doubles after each one up to this
+  value, instead of restarting every hour for the whole outage.
+- `RESTART_ON_WAN_FAIL`: set it to `0` to skip the WAN restart when the WAN
+  address fails too. The default keeps restarting.
+- A LAN left with no usable global address while `odhcp6c` is running is now
+  logged and recovered like a prefix that is not routed; before, v6watch did
+  nothing.
 
 ### Changed
+- The WAN is restarted after `FAIL_THRESHOLD` consecutive failed checks
+  (default 2) instead of at the first one, so a short IPv6 glitch no longer
+  drops IPv4 too. The DHCPv6 renew is still tried at the first failure.
+  `FAIL_THRESHOLD=1` gives the previous behaviour.
 - The README installs the latest release instead of the `main` branch, so
   unreleased changes no longer reach users.
 
