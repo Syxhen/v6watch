@@ -222,3 +222,8 @@ Only the v6watch line is removed from `/jffs/scripts/services-start`.
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
+
+## Development note
+
+v6watch is tested personally by its author on a live router, with the help of
+Claude Code in a personal environment.
