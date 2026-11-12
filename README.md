@@ -40,12 +40,19 @@ Every 5 minutes (via `cru`), v6watch:
 3. if neither host answers:
    - sends `SIGUSR1` to `odhcp6c`, which triggers a DHCPv6 renew that keeps the
      current prefix, and checks again after 30 seconds;
-   - if the prefix is still not routed, runs `service restart_wan`, **at most
-     once per hour**;
+   - if the prefix is still not routed at the next check too (two failed
+     checks in a row, so a short glitch does not cost a restart), runs
+     `service restart_wan`, **at most once per hour**;
+   - if the restart does not help, tries again later, waiting twice as long
+     each time (1, 2, 4 hours...) up to once a day;
 4. logs prefix changes, failures, recoveries and a daily "still working" entry.
 
 When the prefix fails, v6watch also tests the router's WAN address, so the log
 tells a dead delegated prefix apart from a general IPv6 outage.
+
+A LAN left with no usable global address while `odhcp6c` is running (the
+prefix expired or was never delegated) is handled like a prefix that is not
+routed.
 
 Logs go to syslog (tag `v6watch`) and to a persistent file on `/jffs`. To spare
 the flash, v6watch writes to `/jffs` only when something happens: during a long
@@ -74,7 +81,7 @@ rm -rf v6watch
 ```
 
 The same commands upgrade an existing installation. A specific version is at
-`https://github.com/Syxhen/v6watch/releases/download/v0.1.0/v6watch.tar.gz`.
+`https://github.com/Syxhen/v6watch/releases/download/v0.2.0/v6watch.tar.gz`.
 
 The installer:
 
@@ -101,7 +108,7 @@ Running it again upgrades the script and changes nothing else.
 Example output of `check`:
 
 ```
-v6watch 0.1.0
+v6watch 0.2.0
 LAN address: 2001:db8:0:2e00::1 (br0)
 WAN address: 2001:db8:ffff:1::2 (wan0)
   2606:4700:4700::1111: reply
@@ -122,8 +129,8 @@ Example:
 2026-10-20 09:15:02 Watching LAN prefix: 2001:db8:0:2e00::1 (router uptime 52h)
 2026-10-21 12:00:04 Daily check: 2001:db8:0:2e00::1 routed (router uptime 78h)
 2026-10-22 03:40:05 Prefix of 2001:db8:0:2e00::1 not routed (WAN address 2001:db8:ffff:1::2 works): trying a DHCPv6 renew
-2026-10-22 03:40:41 Still not routed: restarting the WAN
-2026-10-22 03:42:12 After the WAN restart: new prefix 2001:db8:0:2e00::1 -> 2001:db8:0:5a00::1, routed (outage lasted 2 min)
+2026-10-22 03:45:38 Still not routed: restarting the WAN
+2026-10-22 03:47:09 After the WAN restart: new prefix 2001:db8:0:2e00::1 -> 2001:db8:0:5a00::1, routed (outage lasted 7 min)
 ```
 
 The router uptime shown next to prefix changes
@@ -144,7 +151,10 @@ run, except `CRON_SCHEDULE`, which needs `v6watch.sh cron`.
 | `PING_COUNT` / `PING_TIMEOUT` | `2` / `3` | pings per target, seconds to wait |
 | `RENEW_WAIT` | `30` | seconds between the renew and the new check |
 | `RESTART_WAIT` | `90` | seconds between the WAN restart and the new check |
+| `FAIL_THRESHOLD` | `2` | consecutive failed checks before a WAN restart |
 | `RESTART_MIN_INTERVAL` | `3600` | minimum seconds between two WAN restarts |
+| `RESTART_MAX_INTERVAL` | `86400` | longest wait between two WAN restarts of the same outage |
+| `RESTART_ON_WAN_FAIL` | `1` | restart the WAN also when the WAN address fails too; `0` to disable |
 | `DAILY_CHECK` | `1200` | time (HHMM) of the daily log entry, empty to disable |
 | `CRON_SCHEDULE` | `*/5 * * * *` | how often v6watch runs |
 | `LOG_FILE` / `LOG_LINES` | `.../v6watch.log` / `1000` | persistent log and its size |
@@ -184,8 +194,14 @@ Only the v6watch line is removed from `/jffs/scripts/services-start`.
 ## Limitations
 
 - A WAN restart also drops IPv4 for about a minute.
+- With the defaults a dead prefix is restored 5 to 10 minutes after it stops
+  working: the WAN is restarted at the second failed check. `FAIL_THRESHOLD=1`
+  restarts it at the first one.
 - During a general IPv6 outage (the WAN address fails too) v6watch still
-  restarts the WAN, at most once per `RESTART_MIN_INTERVAL`.
+  restarts the WAN, because a restart is what recovers a session lost by the
+  ISP; the growing wait keeps that to a few restarts a day. Set
+  `RESTART_ON_WAN_FAIL=0` to restart only when the delegated prefix alone
+  fails.
 - Only the main LAN is checked; guest networks on other /64s of the same
   delegated prefix are not.
 - v6watch is meant for single-WAN setups, and the installer warns when Dual
@@ -206,3 +222,8 @@ Only the v6watch line is removed from `/jffs/scripts/services-start`.
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
+
+## Development note
+
+v6watch is tested personally by its author on a live router, with the help of
+Claude Code in a personal environment.
