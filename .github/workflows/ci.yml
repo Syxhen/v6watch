@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # The job name "shellcheck" is a required status check of main: keep it
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck
+        run: |
+          shellcheck --version
+          shellcheck -s sh v6watch.sh install.sh uninstall.sh v6watch.conf
+          shellcheck -s bash tests/run.sh
+      - name: Check line endings
+        run: |
+          if grep -l $'\r' v6watch.sh install.sh uninstall.sh v6watch.conf tests/run.sh; then
+            echo "Files above have CRLF line endings" >&2
+            exit 1
+          fi
+
+  # Scenario tests with stub router commands, under the shell the routers use
+  # (BusyBox ash) and two stricter POSIX shells
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install BusyBox
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq busybox
+      - name: Run the tests
+        run: bash tests/run.sh "busybox sh" dash "bash --posix"

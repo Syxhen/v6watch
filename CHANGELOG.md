@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Automated scenario tests (`tests/run.sh`) with stub router commands, run in
+  GitHub Actions under BusyBox `sh`, `dash` and `bash --posix`.
+
 ## [0.2.0] - 2026-11-12
 
 ### Added

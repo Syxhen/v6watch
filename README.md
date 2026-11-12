@@ -219,6 +219,18 @@ Only the v6watch line is removed from `/jffs/scripts/services-start`.
 - OpenWrt port (it uses the same `odhcp6c`).
 - amtm integration.
 
+## Tests
+
+`tests/run.sh` runs v6watch through its scenarios (glitch, renew, WAN
+restart, backoff, missing address...) with stub router commands, on any
+machine with bash:
+
+```sh
+bash tests/run.sh dash "busybox sh"
+```
+
+GitHub Actions runs them, together with ShellCheck, on every push.
+
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
