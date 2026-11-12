@@ -16,16 +16,20 @@
 # Copyright (C) 2026 Syxhen
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-VERSION=0.2.0
+VERSION=0.3.0-beta.1
 ADDON_DIR=/jffs/addons/v6watch.d
 CONF=${V6WATCH_CONF:-$ADDON_DIR/v6watch.conf}
 
-# Runtime state, kept in RAM
+# Runtime state, kept in RAM. Times are seconds of router uptime, which, unlike
+# the clock, is right before NTP syncs and never jumps; /tmp is emptied at
+# every boot anyway
 STAMP_FILE=/tmp/v6watch.last   # time of the last WAN restart
 FAIL_FILE=/tmp/v6watch.fail    # start time of the current outage
 COUNT_FILE=/tmp/v6watch.count  # consecutive failed checks of the current outage
 TRIES_FILE=/tmp/v6watch.tries  # WAN restarts of the current outage
+DAY_FILE=/tmp/v6watch.day      # date (YYYYMMDD) of the last daily check entry
 LOCK_DIR=/tmp/v6watch.lock
+UPTIME_FILE=/proc/uptime
 
 # Defaults; override them in $CONF
 LAN_IF=br0
@@ -44,8 +48,34 @@ LOG_FILE=$ADDON_DIR/v6watch.log
 LOG_LINES=1000
 STATE_FILE=$ADDON_DIR/v6watch.prefix
 
+# Settings that must be whole numbers, and those of them that must be at least 1
+NUMBERS="PING_COUNT PING_TIMEOUT RENEW_WAIT RESTART_WAIT FAIL_THRESHOLD RESTART_MIN_INTERVAL RESTART_MAX_INTERVAL LOG_LINES"
+POSITIVE="PING_COUNT PING_TIMEOUT FAIL_THRESHOLD LOG_LINES"
+for n in $NUMBERS RESTART_ON_WAN_FAIL DAILY_CHECK; do
+  eval "default_$n=\$$n"
+done
+
 # shellcheck source=/dev/null
 [ -r "$CONF" ] && . "$CONF"
+
+# A bad value in the config must not break the watchdog: warn and use the default
+bad_setting() {
+  eval "d=\$default_$1"
+  logger -t v6watch "Invalid $1='$2' in $CONF, using $d"
+  [ -t 2 ] && echo "Warning: invalid $1='$2' in $CONF, using $d" >&2
+  eval "$1=\$d"
+}
+for n in $NUMBERS; do
+  eval "v=\$$n"
+  case $v in ''|*[!0-9]*) bad_setting "$n" "$v"; continue ;; esac
+  case " $POSITIVE " in *" $n "*) [ "$v" -ge 1 ] || bad_setting "$n" "$v" ;; esac
+done
+case $RESTART_ON_WAN_FAIL in 0|1) ;; *) bad_setting RESTART_ON_WAN_FAIL "$RESTART_ON_WAN_FAIL" ;; esac
+case $DAILY_CHECK in
+  '') ;;
+  [01][0-9][0-5][0-9]|2[0-3][0-5][0-9]) ;;
+  *) bad_setting DAILY_CHECK "$DAILY_CHECK" ;;
+esac
 
 # Event: syslog and persistent log
 log() {
@@ -72,7 +102,12 @@ wan_if() {
 }
 
 uptime_h() {
-  awk '{printf "%dh", $1 / 3600}' /proc/uptime
+  awk '{printf "%dh", $1 / 3600}' "$UPTIME_FILE"
+}
+
+# Whole seconds of router uptime: the clock of the state files
+now_s() {
+  awk '{printf "%d", $1}' "$UPTIME_FILE"
 }
 
 # Looks a command up in $PATH: the BusyBox sh on some firmwares lacks `command -v`
@@ -123,30 +158,53 @@ restart_interval() {
   echo "$i"
 }
 
-# Reads a number of seconds from a file, 0 if missing or invalid
+# Reads a time (seconds of uptime) from a file; 0 if it is missing, invalid or
+# in the future, like the clock time an older version wrote there
 read_time() {
   v=$(cat "$1" 2>/dev/null)
   case $v in ''|*[!0-9]*) v=0 ;; esac
+  [ "$v" -gt "$(now_s)" ] && v=0
   echo "$v"
 }
 
+# One run at a time. A lock is stale if its process is gone, or if it is older
+# than any run can last: its PID may have been reused by another process
 lock() {
   if ! mkdir "$LOCK_DIR" 2>/dev/null; then
     pid=$(cat "$LOCK_DIR/pid" 2>/dev/null)
-    [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && exit 0
+    since=$(read_time "$LOCK_DIR/since")
+    max=$((RENEW_WAIT + RESTART_WAIT + 600))
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null &&
+       [ $(($(now_s) - since)) -lt "$max" ]; then
+      exit 0
+    fi
     rm -rf "$LOCK_DIR"
     mkdir "$LOCK_DIR" 2>/dev/null || exit 0
   fi
   echo $$ > "$LOCK_DIR/pid"
+  now_s > "$LOCK_DIR/since"
   trap 'rm -rf "$LOCK_DIR"' EXIT
   trap 'exit 1' HUP INT TERM
+}
+
+# The "still working" entry: at the first good check from DAILY_CHECK on, once
+# a day, so it no longer has to fall on a minute when the cron job runs.
+# Skipped while the clock is not set yet (it starts in 1970 until NTP syncs)
+daily_check() {
+  [ -n "$DAILY_CHECK" ] || return 0
+  set -- "$1" "$2" "$(date +%Y%m%d)" "$(date +%H%M)"
+  [ "$3" -ge 20250101 ] || return 0
+  [ "$4" -ge "$DAILY_CHECK" ] || return 0
+  [ "$(cat "$DAY_FILE" 2>/dev/null)" = "$3" ] && return 0
+  echo "$3" > "$DAY_FILE"
+  log "Daily check: $1 routed (router uptime $2)"
 }
 
 # Called when the prefix works again; closes the current outage, if any
 recovered() {
   if [ -f "$FAIL_FILE" ]; then
     start=$(read_time "$FAIL_FILE")
-    end=$(date +%s)
+    end=$(now_s)
     rm -f "$FAIL_FILE" "$COUNT_FILE" "$TRIES_FILE"
     log "$1 (outage lasted $(( (end - start) / 60 )) min)"
   fi
@@ -171,9 +229,7 @@ cmd_run() {
 
     if routed "$src"; then
       recovered "Prefix of $src routed again"
-      if [ -n "$DAILY_CHECK" ] && [ "$(date +%H%M)" = "$DAILY_CHECK" ]; then
-        log "Daily check: $src routed (router uptime $up)"
-      fi
+      daily_check "$src" "$up"
       exit 0
     fi
     what="Prefix of $src not routed"
@@ -189,7 +245,7 @@ cmd_run() {
     out=note
   else
     out=log
-    date +%s > "$FAIL_FILE"
+    now_s > "$FAIL_FILE"
   fi
   fails=$(( $(read_time "$COUNT_FILE") + 1 ))
   echo "$fails" > "$COUNT_FILE"
@@ -225,7 +281,7 @@ cmd_run() {
     exit 0
   fi
 
-  now=$(date +%s)
+  now=$(now_s)
   last=$(read_time "$STAMP_FILE")
   tries=$(read_time "$TRIES_FILE")
   gap=$(restart_interval "$tries")

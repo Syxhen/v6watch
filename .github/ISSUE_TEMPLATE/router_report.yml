@@ -1,0 +1,29 @@
+name: Works on my router
+description: Tell us v6watch works on a model or connection not listed yet
+labels: [compatibility]
+body:
+  - type: input
+    id: router
+    attributes:
+      label: Router model and firmware
+      placeholder: RT-AX86U, Asuswrt-Merlin 3004.388.8
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: WAN connection type
+      options: [IPoE / DHCP, PPPoE, Other]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: v6watch version
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: ISP behaviour, prefix length, anything worth knowing. No real addresses, please.

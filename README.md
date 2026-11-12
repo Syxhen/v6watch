@@ -83,6 +83,13 @@ rm -rf v6watch
 The same commands upgrade an existing installation. A specific version is at
 `https://github.com/Syxhen/v6watch/releases/download/v0.2.0/v6watch.tar.gz`.
 
+Test versions are published as **pre-releases** (tags like `v0.3.0-beta.1`):
+the commands above never install them. To try one, replace `latest/download`
+with `download/<tag>`, for example
+`https://github.com/Syxhen/v6watch/releases/download/v0.3.0-beta.1/v6watch.tar.gz`,
+and report problems in an issue. Running the commands above again goes back to
+the last stable version.
+
 The installer:
 
 - checks the prerequisites;
@@ -142,7 +149,9 @@ so a WAN restart does not reset it.
 
 Edit `/jffs/addons/v6watch.d/v6watch.conf`. Every setting is commented out and
 shows its default; uncomment a line to change it. Changes apply at the next
-run, except `CRON_SCHEDULE`, which needs `v6watch.sh cron`.
+run, except `CRON_SCHEDULE`, which needs `v6watch.sh cron`. An invalid value
+(for example a letter in a number) is reported in syslog, and by `check`, and
+replaced by its default.
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -155,7 +164,7 @@ run, except `CRON_SCHEDULE`, which needs `v6watch.sh cron`.
 | `RESTART_MIN_INTERVAL` | `3600` | minimum seconds between two WAN restarts |
 | `RESTART_MAX_INTERVAL` | `86400` | longest wait between two WAN restarts of the same outage |
 | `RESTART_ON_WAN_FAIL` | `1` | restart the WAN also when the WAN address fails too; `0` to disable |
-| `DAILY_CHECK` | `1200` | time (HHMM) of the daily log entry, empty to disable |
+| `DAILY_CHECK` | `1200` | time (HHMM) from which the daily log entry is written, empty to disable |
 | `CRON_SCHEDULE` | `*/5 * * * *` | how often v6watch runs |
 | `LOG_FILE` / `LOG_LINES` | `.../v6watch.log` / `1000` | persistent log and its size |
 | `STATE_FILE` | `.../v6watch.prefix` | last seen LAN address |

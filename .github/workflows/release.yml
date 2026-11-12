@@ -3,6 +3,9 @@ name: Release
 # Pushing a v* tag builds v6watch.tar.gz and publishes it as a release asset,
 # so the README can always download
 # https://github.com/Syxhen/v6watch/releases/latest/download/v6watch.tar.gz
+# A tag with a suffix (v0.3.0-beta.1, v0.3.0-rc.1) is published as a
+# pre-release: it is never "latest", so the README install keeps getting the
+# last stable version. Its notes come from the "Unreleased" CHANGELOG section.
 # Run it by hand to (re)attach the archive to an existing tag.
 
 on:
@@ -47,7 +50,9 @@ jobs:
 
       - name: Extract the release notes from CHANGELOG.md
         run: |
-          awk -v v="${TAG#v}" 'index($0, "## [" v "]") == 1 {f = 1; next} /^## \[/ {f = 0} f' CHANGELOG.md > notes.md
+          case $TAG in *-*) v=Unreleased ;; *) v=${TAG#v} ;; esac
+          awk -v v="$v" 'index($0, "## [" v "]") == 1 {f = 1; next} /^## \[/ {f = 0} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "No CHANGELOG section for $v" >&2; exit 1; }
           cat notes.md
 
       - name: Publish
@@ -55,6 +60,7 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" v6watch.tar.gz --clobber
           else
-            gh release create "$TAG" v6watch.tar.gz --verify-tag \
+            case $TAG in *-*) pre=--prerelease ;; *) pre=--latest ;; esac
+            gh release create "$TAG" v6watch.tar.gz --verify-tag "$pre" \
               --title "v6watch ${TAG#v}" --notes-file notes.md
           fi
