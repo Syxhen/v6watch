@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-12
+
 ### Added
 - The installer warns when Dual WAN is enabled; the README explains why
   v6watch and Dual WAN (e.g. the WAN Failover add-on) get in each other's way.
@@ -51,5 +53,6 @@ First public version.
   ISP.
 - ShellCheck on every push (GitHub Actions).
 
-[Unreleased]: https://github.com/Syxhen/v6watch/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Syxhen/v6watch/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Syxhen/v6watch/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Syxhen/v6watch/releases/tag/v0.1.0
