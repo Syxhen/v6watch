@@ -41,6 +41,14 @@ stub killall 'echo renew >> "$SC/calls"; [ -f "$SC/on_renew" ] && . "$SC/on_rene
 stub service 'echo "$*" >> "$SC/calls"; [ -f "$SC/on_restart" ] && . "$SC/on_restart"; exit 0'
 stub logger 'shift 2; echo "$*" >> "$SC/syslog"'
 stub sleep 'exit 0'
+# date: the hour and the day come from $SC/hm and $SC/day when they exist
+stub date 'case $1 in
+  +%H%M) [ -f "$SC/hm" ] && { cat "$SC/hm"; exit 0; } ;;
+  +%Y%m%d) [ -f "$SC/day" ] && { cat "$SC/day"; exit 0; } ;;
+esac
+PATH="$REAL_PATH" exec date "$@"'
+export REAL_PATH=$PATH
+NOW=100000   # router uptime, in seconds, during the tests
 
 total=0
 fails=0
@@ -54,6 +62,7 @@ reset() {
   echo "$LAN" > "$SC/lan"
   echo "$WAN" > "$SC/wan"
   printf '%s\n%s\n' "$LAN" "$WAN" > "$SC/good"
+  echo "$NOW.42 345678.90" > "$SC/uptime"
   cat > "$SC/conf" <<EOF
 LOG_FILE=$SC/log
 STATE_FILE=$SC/state
@@ -62,6 +71,8 @@ FAIL_FILE=$SC/fail
 COUNT_FILE=$SC/count
 TRIES_FILE=$SC/tries
 LOCK_DIR=$SC/lock
+DAY_FILE=$SC/daily
+UPTIME_FILE=$SC/uptime
 RENEW_WAIT=0
 RESTART_WAIT=0
 DAILY_CHECK=
@@ -76,7 +87,7 @@ exists() { if [ -e "$SC/$1" ]; then echo yes; else echo no; fi; }
 prefix_dead() { echo "$WAN" > "$SC/good"; }
 all_dead() { : > "$SC/good"; }
 all_good() { printf '%s\n%s\n' "$LAN" "$WAN" > "$SC/good"; }
-ago() { echo $(( $(date +%s) - $1 )) > "$SC/last"; }   # last WAN restart $1 s ago
+ago() { echo $((NOW - $1)) > "$SC/last"; }   # last WAN restart $1 s ago
 
 ok() { # description, actual, expected
   total=$((total + 1))
@@ -189,11 +200,54 @@ scenarios() {
   ok "restart at check 1" "$(restarts)" 1
 
   echo "lock"
-  reset; mkdir "$SC/lock"; echo $$ > "$SC/lock/pid"; prefix_dead; run
+  reset; mkdir "$SC/lock"; echo $$ > "$SC/lock/pid"; echo $((NOW - 60)) > "$SC/lock/since"
+  prefix_dead; run
   ok "skips while another run is alive" "$(renews)" 0
-  echo 999999 > "$SC/lock/pid"; run
-  ok "takes over a stale lock" "$(renews)" 1
+  echo $((NOW - 1000)) > "$SC/lock/since"; run
+  ok "takes over a lock older than any run (reused PID)" "$(renews)" 1
+  mkdir "$SC/lock"; echo 999999 > "$SC/lock/pid"; echo "$NOW" > "$SC/lock/since"; run
+  ok "takes over the lock of a dead process" "$(renews)" 2
   ok "lock released" "$(exists lock)" no
+
+  echo "uptime clock"
+  reset; run; prefix_dead
+  echo 1762940000 > "$SC/last"; echo 1762940000 > "$SC/fail"; run; run
+  ok "clock time of an older version is ignored" "$(restarts)" 1
+  all_good; run
+  has "outage measured from 0, not negative" log "routed again (outage lasted"
+  ok "no negative duration" "$(grep -c 'lasted -' "$SC/log")" 0
+  reset; run; prefix_dead; run; echo "$((NOW + 600)).00 0" > "$SC/uptime"; all_good; run
+  has "duration from uptime" log "routed again (outage lasted 10 min)"
+
+  echo "daily check"
+  reset; sed -i '/^DAILY_CHECK=/d' "$SC/conf"; echo 20261112 > "$SC/day"
+  echo 1159 > "$SC/hm"; run
+  ok "not before DAILY_CHECK" "$(grep -c 'Daily check' "$SC/log")" 0
+  echo 1203 > "$SC/hm"; run
+  has "first good run after it" log "Daily check: $LAN routed (router uptime 27h)"
+  echo 1208 > "$SC/hm"; run
+  ok "once a day" "$(grep -c 'Daily check' "$SC/log")" 1
+  echo 20261113 > "$SC/day"; echo 0005 > "$SC/hm"; run
+  ok "next day, before the hour: nothing" "$(grep -c 'Daily check' "$SC/log")" 1
+  echo 1200 > "$SC/hm"; run
+  ok "next day, at the hour" "$(grep -c 'Daily check' "$SC/log")" 2
+  reset; sed -i '/^DAILY_CHECK=/d' "$SC/conf"; echo 19700101 > "$SC/day"; echo 1300 > "$SC/hm"; run
+  ok "clock not set yet: skipped" "$(grep -c 'Daily check' "$SC/log")" 0
+  reset; echo 20261112 > "$SC/day"; echo 2359 > "$SC/hm"; run
+  ok "DAILY_CHECK empty: never" "$(grep -c 'Daily check' "$SC/log")" 0
+
+  echo "invalid settings"
+  reset
+  printf 'PING_COUNT=two\nFAIL_THRESHOLD=0\nRESTART_ON_WAN_FAIL=yes\nDAILY_CHECK=25:00\nRESTART_MIN_INTERVAL=\n' >> "$SC/conf"
+  run; prefix_dead; run
+  has "PING_COUNT reported" syslog "Invalid PING_COUNT='two'"
+  has "FAIL_THRESHOLD reported" syslog "Invalid FAIL_THRESHOLD='0'"
+  has "RESTART_ON_WAN_FAIL reported" syslog "Invalid RESTART_ON_WAN_FAIL='yes'"
+  has "DAILY_CHECK reported" syslog "Invalid DAILY_CHECK='25:00'"
+  has "empty number reported" syslog "Invalid RESTART_MIN_INTERVAL=''"
+  ok "defaults used: no restart at check 1" "$(restarts)" 0
+  run
+  ok "defaults used: restart at check 2" "$(restarts)" 1
 
   echo "check command"
   reset

@@ -9,6 +9,24 @@ All notable changes to this project are documented here. The format follows
 ### Added
 - Automated scenario tests (`tests/run.sh`) with stub router commands, run in
   GitHub Actions under BusyBox `sh`, `dash` and `bash --posix`.
+- Invalid settings in `v6watch.conf` (a letter in a number, a zero threshold,
+  a wrong `DAILY_CHECK` time...) are reported in syslog, and by `check`, and
+  replaced by their defaults instead of breaking the run.
+- Pre-releases: tags like `v0.3.0-beta.1` are published as GitHub
+  pre-releases, which the README install never picks up.
+- Issue templates for bug reports and for routers where v6watch works.
+
+### Changed
+- Outage durations and the WAN restart rate limit are measured on the router
+  uptime instead of the clock, which is wrong until NTP syncs and can jump.
+- The daily check is written at the first good check from `DAILY_CHECK` on,
+  once a day, instead of only when a run falls exactly on that minute, and is
+  skipped while the clock is not set yet.
+
+### Fixed
+- A run could be skipped for as long as another process reused the PID of a
+  run that had died holding the lock: a lock older than any run can last is
+  now taken over.
 
 ## [0.2.0] - 2026-11-12
 

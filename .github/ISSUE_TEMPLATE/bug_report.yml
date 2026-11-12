@@ -1,0 +1,55 @@
+name: Bug report
+description: v6watch does something wrong, or nothing when it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **Before pasting anything, replace your real
+        prefixes and addresses** with documentation ones (`2001:db8::/32`),
+        as explained in [docs/isp-evidence.md](https://github.com/Syxhen/v6watch/blob/main/docs/isp-evidence.md#before-you-share-anything).
+  - type: input
+    id: version
+    attributes:
+      label: v6watch version
+      description: Output of `/jffs/addons/v6watch.d/v6watch.sh version`
+      placeholder: v6watch 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: router
+    attributes:
+      label: Router model and firmware
+      placeholder: RT-BE88U, Asuswrt-Merlin 3006.102.9
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: WAN connection type
+      options: [IPoE / DHCP, PPPoE, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: check
+    attributes:
+      label: Output of `v6watch.sh check`
+      render: text
+  - type: textarea
+    id: log
+    attributes:
+      label: Relevant lines of the log
+      description: "`tail -n 30 /jffs/addons/v6watch.d/v6watch.log` and `grep v6watch /tmp/syslog.log | tail -n 30`"
+      render: text
+  - type: textarea
+    id: config
+    attributes:
+      label: Changed settings
+      description: "`grep -v '^#' /jffs/addons/v6watch.d/v6watch.conf | grep .` (empty if you use the defaults)"
+      render: text
