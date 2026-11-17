@@ -16,7 +16,7 @@
 # Copyright (C) 2026 Syxhen
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-VERSION=0.3.0-beta.1
+VERSION=0.3.0
 ADDON_DIR=/jffs/addons/v6watch.d
 CONF=${V6WATCH_CONF:-$ADDON_DIR/v6watch.conf}
 
