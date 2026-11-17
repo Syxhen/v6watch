@@ -81,12 +81,12 @@ rm -rf v6watch
 ```
 
 The same commands upgrade an existing installation. A specific version is at
-`https://github.com/Syxhen/v6watch/releases/download/v0.2.0/v6watch.tar.gz`.
+`https://github.com/Syxhen/v6watch/releases/download/v0.3.0/v6watch.tar.gz`.
 
-Test versions are published as **pre-releases** (tags like `v0.3.0-beta.1`):
+Test versions are published as **pre-releases** (tags like `v0.4.0-beta.1`):
 the commands above never install them. To try one, replace `latest/download`
 with `download/<tag>`, for example
-`https://github.com/Syxhen/v6watch/releases/download/v0.3.0-beta.1/v6watch.tar.gz`,
+`https://github.com/Syxhen/v6watch/releases/download/v0.4.0-beta.1/v6watch.tar.gz`,
 and report problems in an issue. Running the commands above again goes back to
 the last stable version.
 
@@ -115,7 +115,7 @@ Running it again upgrades the script and changes nothing else.
 Example output of `check`:
 
 ```
-v6watch 0.2.0
+v6watch 0.3.0
 LAN address: 2001:db8:0:2e00::1 (br0)
 WAN address: 2001:db8:ffff:1::2 (wan0)
   2606:4700:4700::1111: reply

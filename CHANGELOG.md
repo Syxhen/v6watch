@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-17
+
 ### Added
 - Automated scenario tests (`tests/run.sh`) with stub router commands, run in
   GitHub Actions under BusyBox `sh`, `dash` and `bash --posix`.
@@ -75,6 +77,7 @@ First public version.
   ISP.
 - ShellCheck on every push (GitHub Actions).
 
-[Unreleased]: https://github.com/Syxhen/v6watch/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Syxhen/v6watch/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Syxhen/v6watch/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Syxhen/v6watch/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Syxhen/v6watch/releases/tag/v0.1.0
