@@ -104,7 +104,31 @@ Running it again upgrades the script and changes nothing else.
 
 ## Usage
 
+Over SSH, type `v6watch` to open the menu:
+
+```
+  Monitoring   ON, every 5 minutes
+  LAN address  2001:db8:0:2e00::1 (br0)
+  Last check   routed (2 min ago)
+  Last event   2026-11-17 12:00:03 Daily check: 2001:db8:0:5a00::1 routed (router uptime 410h)
+
+  [1] Check the prefix now
+  [2] Show the log
+  [3] Show the settings
+  [4] Pause monitoring
+  [q] Quit
+```
+
+It shows whether the watchdog is running and what the last check found, and
+lets you test the prefix, read the log (colored by event), see which settings
+you changed and pause or resume the monitoring. Colors are used only on a
+terminal, and never with `NO_COLOR` set. The installer adds the `v6watch`
+command to `/jffs/configs/profile.add`; it works from the next SSH login.
+
+The same actions are available as commands, for scripts:
+
 ```sh
+/jffs/addons/v6watch.d/v6watch.sh menu     # the menu (the default from a terminal)
 /jffs/addons/v6watch.d/v6watch.sh check    # test now, print the result, change nothing
 /jffs/addons/v6watch.d/v6watch.sh run      # what cron runs: test and recover if needed
 /jffs/addons/v6watch.d/v6watch.sh cron     # recreate the cron job (after changing the schedule)
@@ -198,7 +222,8 @@ sh /jffs/addons/v6watch.d/uninstall.sh             # remove everything
 sh /jffs/addons/v6watch.d/uninstall.sh --keep-log  # keep the log in /jffs/addons/v6watch.d
 ```
 
-Only the v6watch line is removed from `/jffs/scripts/services-start`.
+Only the v6watch lines are removed from `/jffs/scripts/services-start` and
+`/jffs/configs/profile.add`.
 
 ## Limitations
 
@@ -223,6 +248,7 @@ Only the v6watch line is removed from `/jffs/scripts/services-start`.
 
 ## Roadmap
 
+- Settings edited from the menu, with a first-run setup and updates.
 - Notifications (for example Telegram) when a prefix stops working.
 - Guest network support.
 - OpenWrt port (it uses the same `odhcp6c`).

@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Interactive menu: `v6watch` over SSH shows whether the watchdog is running,
+  the LAN address, the result of the last check and the last event, and lets
+  you check the prefix, read the log (colored by event), see the changed
+  settings and pause or resume the monitoring. Colors only on a terminal and
+  never with `NO_COLOR`.
+- The `v6watch` command, added by the installer to
+  `/jffs/configs/profile.add` (and removed by the uninstaller).
+- `v6watch.sh menu`; with no command, `v6watch.sh` opens the menu when started
+  from a terminal and does a run otherwise, as before.
+- Every run records its result in `/tmp/v6watch.status` for the menu.
+
 ## [0.3.0] - 2026-11-17
 
 ### Added

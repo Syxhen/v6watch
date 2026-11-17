@@ -1,8 +1,9 @@
 #!/bin/sh
 # v6watch uninstaller for Asuswrt-Merlin
 #
-# Removes the cru job, the v6watch line from /jffs/scripts/services-start
-# (other lines are left alone) and /jffs/addons/v6watch.d.
+# Removes the cru job, the v6watch lines from /jffs/scripts/services-start,
+# /jffs/configs/profile.add and /etc/profile (other lines are left alone) and
+# /jffs/addons/v6watch.d.
 # With --keep-log the persistent log stays in /jffs/addons/v6watch.d.
 #
 # Copyright (C) 2026 Syxhen
@@ -17,8 +18,10 @@ case $1 in
 esac
 
 cru d v6watch 2>/dev/null
-[ -f "$HOOK" ] && sed -i '/# v6watch$/d' "$HOOK"
-rm -rf /tmp/v6watch.lock /tmp/v6watch.last /tmp/v6watch.fail /tmp/v6watch.count /tmp/v6watch.tries /tmp/v6watch.day
+for f in "$HOOK" /jffs/configs/profile.add /etc/profile; do
+  [ -w "$f" ] && sed -i '/# v6watch$/d' "$f"
+done
+rm -rf /tmp/v6watch.lock /tmp/v6watch.last /tmp/v6watch.fail /tmp/v6watch.count /tmp/v6watch.tries /tmp/v6watch.day /tmp/v6watch.status
 
 if [ "$1" = --keep-log ] && [ -f "$ADDON_DIR/v6watch.log" ]; then
   for f in "$ADDON_DIR"/*; do

@@ -2,8 +2,9 @@
 # v6watch installer for Asuswrt-Merlin
 #
 # Run it from the directory that contains v6watch.sh. Safe to run again: it
-# updates the script, keeps an existing config and only appends its own line
-# to /jffs/scripts/services-start, never touching lines of other add-ons.
+# updates the script, keeps an existing config and only appends its own lines
+# to /jffs/scripts/services-start and /jffs/configs/profile.add, never
+# touching lines of other add-ons.
 #
 # Copyright (C) 2026 Syxhen
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -11,6 +12,8 @@
 ADDON_DIR=/jffs/addons/v6watch.d
 HOOK=/jffs/scripts/services-start
 HOOK_LINE="$ADDON_DIR/v6watch.sh cron # v6watch"
+PROFILE=/jffs/configs/profile.add
+ALIAS_LINE="alias v6watch='$ADDON_DIR/v6watch.sh' # v6watch"
 SRC_DIR=$(cd "$(dirname "$0")" && pwd)
 
 die() { echo "Error: $1" >&2; exit 1; }
@@ -32,7 +35,7 @@ for c in awk cru ip killall logger pidof service; do
 done
 have ping6 || have ping || die "required command not found: ping6"
 
-for f in v6watch.sh v6watch.conf uninstall.sh; do
+for f in v6watch.sh menu.sh v6watch.conf uninstall.sh; do
   [ -f "$SRC_DIR/$f" ] || die "$f not found in $SRC_DIR"
   # A copy edited or extracted on Windows would break BusyBox sh
   grep -q "$(printf '\r')" "$SRC_DIR/$f" && die "$f has Windows (CRLF) line endings"
@@ -49,7 +52,7 @@ esac
 
 # Files
 mkdir -p "$ADDON_DIR" || die "cannot create $ADDON_DIR"
-cp "$SRC_DIR/v6watch.sh" "$SRC_DIR/uninstall.sh" "$ADDON_DIR/" || die "cannot copy files to $ADDON_DIR"
+cp "$SRC_DIR/v6watch.sh" "$SRC_DIR/menu.sh" "$SRC_DIR/uninstall.sh" "$ADDON_DIR/" || die "cannot copy files to $ADDON_DIR"
 chmod 755 "$ADDON_DIR/v6watch.sh" "$ADDON_DIR/uninstall.sh"
 cp "$SRC_DIR/v6watch.conf" "$ADDON_DIR/v6watch.conf.sample"
 if [ -f "$ADDON_DIR/v6watch.conf" ]; then
@@ -71,8 +74,22 @@ if ! grep -qxF "$HOOK_LINE" "$HOOK"; then
 fi
 chmod a+x "$HOOK"
 
+# The "v6watch" command: Merlin adds profile.add to /etc/profile at every boot;
+# /etc/profile itself lives in RAM, so adding the line there too makes the
+# command work from the next SSH login without a reboot
+mkdir -p /jffs/configs
+for f in "$PROFILE" /etc/profile; do
+  [ "$f" = /etc/profile ] && [ ! -w /etc/profile ] && continue
+  grep -qxF "$ALIAS_LINE" "$f" 2>/dev/null && continue
+  [ -f "$f" ] && sed -i '/# v6watch$/d' "$f"
+  [ -s "$f" ] && [ -n "$(tail -c 1 "$f")" ] && echo >> "$f"
+  echo "$ALIAS_LINE" >> "$f"
+done
+
 "$ADDON_DIR/v6watch.sh" cron || die "cannot create the cru job"
 echo "Installed v6watch $("$ADDON_DIR/v6watch.sh" version | cut -d' ' -f2) in $ADDON_DIR"
 echo
 "$ADDON_DIR/v6watch.sh" check
+echo
+echo "Open a new SSH session and type: v6watch"
 exit 0
