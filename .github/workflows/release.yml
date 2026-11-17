@@ -43,7 +43,7 @@ jobs:
       - name: Build the archive
         run: |
           mkdir v6watch
-          cp v6watch.sh v6watch.conf install.sh uninstall.sh README.md LICENSE CHANGELOG.md v6watch/
+          cp v6watch.sh menu.sh v6watch.conf install.sh uninstall.sh README.md LICENSE CHANGELOG.md v6watch/
           chmod 755 v6watch/*.sh
           # ustar keeps the archive readable by BusyBox tar
           tar --format=ustar --owner=0 --group=0 -czf v6watch.tar.gz v6watch

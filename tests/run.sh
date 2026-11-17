@@ -41,6 +41,12 @@ stub killall 'echo renew >> "$SC/calls"; [ -f "$SC/on_renew" ] && . "$SC/on_rene
 stub service 'echo "$*" >> "$SC/calls"; [ -f "$SC/on_restart" ] && . "$SC/on_restart"; exit 0'
 stub logger 'shift 2; echo "$*" >> "$SC/syslog"'
 stub sleep 'exit 0'
+# cru: the job lives in $SC/cron, in the format "cru l" prints
+stub cru 'case $1 in
+  l) cat "$SC/cron" 2>/dev/null ;;
+  a) echo "$3 #$2#" > "$SC/cron" ;;
+  d) : > "$SC/cron" ;;
+esac; exit 0'
 # date: the hour and the day come from $SC/hm and $SC/day when they exist
 stub date 'case $1 in
   +%H%M) [ -f "$SC/hm" ] && { cat "$SC/hm"; exit 0; } ;;
@@ -72,6 +78,7 @@ COUNT_FILE=$SC/count
 TRIES_FILE=$SC/tries
 LOCK_DIR=$SC/lock
 DAY_FILE=$SC/daily
+STATUS_FILE=$SC/status
 UPTIME_FILE=$SC/uptime
 RENEW_WAIT=0
 RESTART_WAIT=0
@@ -98,6 +105,17 @@ ok() { # description, actual, expected
     fails=$((fails + 1))
   fi
 }
+contains() { # description, text, fixed string
+  total=$((total + 1))
+  case $2 in
+    *"$3"*) echo "  ok   $1" ;;
+    *) echo "  FAIL $1: '$3' not in the output:"; printf '%s\n' "$2" | sed 's/^/         /'
+       fails=$((fails + 1)) ;;
+  esac
+}
+# Feeds keys to the menu, one per line, and captures what it prints
+menu() { printf '%s\n' "$@" | v6 menu; }
+count() { printf '%s\n' "$1" | grep -c -- "$2"; }
 has() { # description, file, fixed string
   total=$((total + 1))
   if grep -qF -- "$3" "$SC/$2"; then
@@ -264,6 +282,53 @@ scenarios() {
   : > "$SC/lan"
   v6 check >/dev/null; rc=$?
   ok "exit 1 without a LAN address" "$rc" 1
+
+  echo "menu"
+  reset; run
+  out=$(menu q); rc=$?
+  ok "q quits" "$rc" 0
+  contains "banner and version" "$out" "IPv6 prefix delegation watchdog - v"
+  contains "monitoring paused without the cru job" "$out" "PAUSED"
+  contains "last check from the status file" "$out" "Last check   routed"
+  contains "last event from the log" "$out" "Watching LAN prefix: $LAN"
+  ok "no color codes outside a terminal" "$(count "$out" "$(printf '\033')")" 0
+  out=$(printf '' | v6 menu); rc=$?
+  ok "end of input quits" "$rc" 0
+  out=$(menu x q)
+  ok "unknown key: menu shown again" "$(count "$out" "Choose:")" 2
+
+  out=$(menu 4 '' q)
+  contains "option 4 resumes" "$out" "Monitoring resumed."
+  has "cru job created" cron "#v6watch#"
+  contains "then shown as ON" "$(menu q)" "ON, every 5 minutes"
+  out=$(menu 4 '' q)
+  contains "option 4 pauses" "$out" "Monitoring paused."
+  ok "cru job removed" "$(lines cron)" 0
+
+  out=$(menu 1 '' q)
+  contains "option 1 runs check" "$out" "Delegated prefix is routed"
+  ok "the menu survives the check" "$(count "$out" "Choose:")" 2
+  ok "the check changes nothing" "$(renews)$(restarts)" 00
+
+  prefix_dead; run
+  contains "failed run shown" "$(menu q)" "Last check   NOT routed"
+  out=$(menu 2 '' q)
+  contains "option 2 shows the log" "$out" "not routed (WAN address $WAN works)"
+
+  echo FAIL_THRESHOLD=3 >> "$SC/conf"
+  out=$(menu 3 '' q)
+  ok "option 3 marks a changed setting" "$(printf '%s\n' "$out" | grep FAIL_THRESHOLD | grep -c "(default: 2)")" 1
+  ok "and not an unchanged one" "$(printf '%s\n' "$out" | grep PING_COUNT | grep -c "(default:")" 0
+  contains "unchanged ones are listed too" "$out" "PING_COUNT"
+
+  reset; rm -f "$SC/log"
+  contains "empty log" "$(menu 2 '' q)" "The log is empty"
+  reset; : > "$SC/lan"
+  contains "no LAN address" "$(menu q)" "no global address"
+  contains "no check since boot" "$(menu q)" "none since boot"
+
+  reset; prefix_dead; run; v6 < /dev/null
+  ok "no command and no terminal: a run, not the menu" "$(renews)" 2
 
   echo "command line"
   reset

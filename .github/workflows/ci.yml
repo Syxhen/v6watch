@@ -16,11 +16,11 @@ jobs:
       - name: Run ShellCheck
         run: |
           shellcheck --version
-          shellcheck -s sh v6watch.sh install.sh uninstall.sh v6watch.conf
+          shellcheck -s sh v6watch.sh menu.sh install.sh uninstall.sh v6watch.conf
           shellcheck -s bash tests/run.sh
       - name: Check line endings
         run: |
-          if grep -l $'\r' v6watch.sh install.sh uninstall.sh v6watch.conf tests/run.sh; then
+          if grep -l $'\r' v6watch.sh menu.sh install.sh uninstall.sh v6watch.conf tests/run.sh; then
             echo "Files above have CRLF line endings" >&2
             exit 1
           fi

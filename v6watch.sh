@@ -7,8 +7,9 @@
 # limited, less and less often while restarts do not help). Prefix changes,
 # failures and a daily check go to syslog and to a persistent log on /jffs.
 #
-# Usage: v6watch.sh [run|check|cron|uncron|version]
-#   run      check and recover if needed (default, run by cron)
+# Usage: v6watch.sh [menu|run|check|cron|uncron|version]
+#   menu     interactive menu (default when started by hand from a terminal)
+#   run      check and recover if needed (what cron runs; default otherwise)
 #   check    test the current prefix and print the result; no recovery, no log
 #   cron     (re)create the cru job, called from /jffs/scripts/services-start
 #   uncron   remove the cru job
@@ -16,7 +17,7 @@
 # Copyright (C) 2026 Syxhen
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-VERSION=0.3.0
+VERSION=0.4.0-beta.1
 ADDON_DIR=/jffs/addons/v6watch.d
 CONF=${V6WATCH_CONF:-$ADDON_DIR/v6watch.conf}
 
@@ -28,6 +29,7 @@ FAIL_FILE=/tmp/v6watch.fail    # start time of the current outage
 COUNT_FILE=/tmp/v6watch.count  # consecutive failed checks of the current outage
 TRIES_FILE=/tmp/v6watch.tries  # WAN restarts of the current outage
 DAY_FILE=/tmp/v6watch.day      # date (YYYYMMDD) of the last daily check entry
+STATUS_FILE=/tmp/v6watch.status  # result of the last check, for the menu
 LOCK_DIR=/tmp/v6watch.lock
 UPTIME_FILE=/proc/uptime
 
@@ -48,12 +50,16 @@ LOG_FILE=$ADDON_DIR/v6watch.log
 LOG_LINES=1000
 STATE_FILE=$ADDON_DIR/v6watch.prefix
 
+# Every setting, in the order of the config file; their defaults are kept in
+# default_<name> to fix invalid values and to show what was changed
+SETTINGS="LAN_IF TARGETS PING_COUNT PING_TIMEOUT RENEW_WAIT RESTART_WAIT FAIL_THRESHOLD RESTART_MIN_INTERVAL RESTART_MAX_INTERVAL RESTART_ON_WAN_FAIL DAILY_CHECK CRON_SCHEDULE LOG_FILE LOG_LINES STATE_FILE"
+for n in $SETTINGS; do
+  eval "default_$n=\$$n"
+done
+
 # Settings that must be whole numbers, and those of them that must be at least 1
 NUMBERS="PING_COUNT PING_TIMEOUT RENEW_WAIT RESTART_WAIT FAIL_THRESHOLD RESTART_MIN_INTERVAL RESTART_MAX_INTERVAL LOG_LINES"
 POSITIVE="PING_COUNT PING_TIMEOUT FAIL_THRESHOLD LOG_LINES"
-for n in $NUMBERS RESTART_ON_WAN_FAIL DAILY_CHECK; do
-  eval "default_$n=\$$n"
-done
 
 # shellcheck source=/dev/null
 [ -r "$CONF" ] && . "$CONF"
@@ -200,8 +206,14 @@ daily_check() {
   log "Daily check: $1 routed (router uptime $2)"
 }
 
+# Result of the last check ("ok" or "fail") with its time, shown by the menu
+set_status() {
+  echo "$1 $(now_s)" > "$STATUS_FILE"
+}
+
 # Called when the prefix works again; closes the current outage, if any
 recovered() {
+  set_status ok
   if [ -f "$FAIL_FILE" ]; then
     start=$(read_time "$FAIL_FILE")
     end=$(now_s)
@@ -239,6 +251,8 @@ cmd_run() {
     pidof odhcp6c >/dev/null 2>&1 || exit 0
     what="No usable global address on $LAN_IF"
   fi
+
+  set_status fail
 
   # Only the first failure of an outage is written to /jffs
   if [ -f "$FAIL_FILE" ]; then
@@ -343,11 +357,21 @@ cmd_check() {
   exit $rc
 }
 
-case ${1:-run} in
+# No command: the menu for a person at a terminal, a run for anything else
+if [ $# -eq 0 ]; then
+  if [ -t 0 ] && [ -t 1 ]; then set -- menu; else set -- run; fi
+fi
+
+case $1 in
+  menu)
+    # The menu lives next to this script, wherever it was installed
+    # shellcheck source=menu.sh
+    . "$(dirname "$0")/menu.sh" || exit 1
+    cmd_menu ;;
   run) cmd_run ;;
   check) cmd_check ;;
   cron) cru a v6watch "$CRON_SCHEDULE $ADDON_DIR/v6watch.sh run" ;;
   uncron) cru d v6watch ;;
   version) echo "v6watch $VERSION" ;;
-  *) echo "Usage: $0 [run|check|cron|uncron|version]" >&2; exit 2 ;;
+  *) echo "Usage: $0 [menu|run|check|cron|uncron|version]" >&2; exit 2 ;;
 esac
