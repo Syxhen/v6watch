@@ -1,7 +1,29 @@
-# v6watch
+<h1 align="center">v6watch</h1>
 
-IPv6 prefix delegation watchdog for Asuswrt-Merlin: detects delegated prefixes
-that silently stop being routed and recovers automatically.
+<p align="center">
+  IPv6 prefix delegation watchdog for Asuswrt-Merlin:<br>
+  detects delegated prefixes that silently stop being routed and recovers automatically.
+</p>
+
+<p align="center">
+  <a href="https://github.com/Syxhen/v6watch/releases/latest"><img alt="Download the latest release" src="https://img.shields.io/github/v/release/Syxhen/v6watch?style=for-the-badge&amp;label=download&amp;labelColor=0d1117&amp;color=39c5cf"></a>
+</p>
+
+<p align="center">
+  Asuswrt-Merlin 384.15+ · plain BusyBox sh · no Entware · <a href="#install">one command to install</a>
+</p>
+
+<p align="center">
+  <a href="#requirements"><img alt="Asuswrt-Merlin 384.15+" src="https://img.shields.io/badge/Asuswrt--Merlin-384.15%2B-1f6feb"></a>
+  <a href="#requirements"><img alt="Shell: BusyBox sh" src="https://img.shields.io/badge/shell-BusyBox%20sh-4eaa25?logo=gnubash&amp;logoColor=white"></a>
+  <a href="https://github.com/Syxhen/v6watch/actions/workflows/ci.yml"><img alt="Tests" src="https://img.shields.io/github/actions/workflow/status/Syxhen/v6watch/ci.yml?branch=main&amp;label=tests"></a>
+  <a href="https://github.com/Syxhen/v6watch/releases"><img alt="Latest release, including betas" src="https://img.shields.io/github/v/release/Syxhen/v6watch?include_prereleases&amp;label=newest&amp;color=e3793b"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/Syxhen/v6watch"></a>
+</p>
+
+<p align="center">
+  <img src="docs/images/menu.svg" width="760" alt="The v6watch menu over SSH: monitoring on, the LAN address, the last check routed, the last event, and keys to check the prefix, show the log, show the settings, pause monitoring or quit">
+</p>
 
 ## The problem
 
