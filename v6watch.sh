@@ -17,7 +17,7 @@
 # Copyright (C) 2026 Syxhen
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-VERSION=0.4.0-beta.1
+VERSION=0.4.0
 ADDON_DIR=/jffs/addons/v6watch.d
 CONF=${V6WATCH_CONF:-$ADDON_DIR/v6watch.conf}
 
@@ -349,9 +349,12 @@ cmd_check() {
       echo "  $t: no reply"
     fi
   done
+  # The menu shows the latest result, whether it came from cron or from here
   if [ $rc -eq 0 ]; then
+    set_status ok
     echo "Delegated prefix is routed"
   else
+    set_status fail
     echo "Delegated prefix is NOT routed ($(wan_status))"
   fi
   exit $rc

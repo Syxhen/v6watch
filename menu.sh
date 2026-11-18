@@ -38,10 +38,13 @@ monitoring_on() {
 
 # "12 min ago" from a time in seconds of uptime
 ago() {
+  case $1 in ''|*[!0-9]*) echo "unknown time"; return ;; esac
   s=$(( $(now_s) - $1 ))
-  if [ "$s" -lt 120 ]; then echo "$s s ago"
+  if [ "$s" -lt 0 ]; then echo "unknown time"
+  elif [ "$s" -lt 120 ]; then echo "$s s ago"
   elif [ "$s" -lt 7200 ]; then echo "$((s / 60)) min ago"
-  else echo "$((s / 3600)) h ago"
+  elif [ "$s" -lt 172800 ]; then echo "$((s / 3600)) h ago"
+  else echo "$((s / 86400)) days ago"
   fi
 }
 

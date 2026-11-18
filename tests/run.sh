@@ -312,6 +312,20 @@ scenarios() {
 
   prefix_dead; run
   contains "failed run shown" "$(menu q)" "Last check   NOT routed"
+  all_good; out=$(menu 1 '' q)
+  ok "a check from the menu updates the last check" "$(count "$out" "Last check   routed")" 1
+  prefix_dead; v6 check >/dev/null
+  contains "and so does check from the command line" "$(menu q)" "Last check   NOT routed"
+  echo "ok garbage" > "$SC/status"
+  contains "bad status file" "$(menu q)" "routed (unknown time)"
+  echo "ok $((NOW + 1000))" > "$SC/status"
+  contains "time after the uptime: unknown" "$(menu q)" "routed (unknown time)"
+  echo "ok 1000" > "$SC/status"; echo "260000.00 0" > "$SC/uptime"
+  contains "old check shown in whole days" "$(menu q)" "routed (2 days ago)"
+  echo "$NOW.42 0" > "$SC/uptime"
+  echo "ok $((NOW - 7300))" > "$SC/status"
+  contains "recent one in hours" "$(menu q)" "routed (2 h ago)"
+  run
   out=$(menu 2 '' q)
   contains "option 2 shows the log" "$out" "not routed (WAN address $WAN works)"
 
