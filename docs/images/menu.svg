@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="412" viewBox="0 0 860 412" role="img" aria-labelledby="title">
+  <title id="title">The v6watch menu: monitoring on, LAN address, last check routed, last event, and the menu keys</title>
+  <style>
+    text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono", monospace; font-size: 14px; fill: #c9d1d9; white-space: pre; }
+    .cyan { fill: #39c5cf; }
+    .green { fill: #3fb950; }
+    .dim { fill: #8b949e; }
+    .bold { font-weight: 700; }
+    .key { fill: #39c5cf; font-weight: 700; }
+    .bar { fill: #8b949e; font-size: 12px; }
+  </style>
+
+  <!-- Terminal window -->
+  <rect width="860" height="412" rx="10" fill="#0d1117"/>
+  <rect width="860" height="34" rx="10" fill="#161b22"/>
+  <rect y="24" width="860" height="10" fill="#161b22"/>
+  <circle cx="22" cy="17" r="6" fill="#ff5f57"/>
+  <circle cx="42" cy="17" r="6" fill="#febc2e"/>
+  <circle cx="62" cy="17" r="6" fill="#28c840"/>
+  <text class="bar" x="430" y="21" text-anchor="middle">admin@router: ~</text>
+
+  <!-- Banner -->
+  <text class="cyan" x="24" y="62">         __                     _          _</text>
+  <text class="cyan" x="24" y="80">__   __ / /_  __      __  __ _ | |_   ___ | |__</text>
+  <text class="cyan" x="24" y="98">\ \ / /| '_ \ \ \ /\ / / / _` || __| / __|| '_ \</text>
+  <text class="cyan" x="24" y="116"> \ V / | (_) | \ V  V / | (_| || |_ | (__ | | | |</text>
+  <text class="cyan" x="24" y="134">  \_/   \___/   \_/\_/   \__,_| \__| \___||_| |_|</text>
+  <text class="dim" x="24" y="152"> IPv6 prefix delegation watchdog - v0.4.0</text>
+
+  <!-- Status panel -->
+  <text x="24" y="188">  Monitoring   <tspan class="green">ON</tspan>, every 5 minutes</text>
+  <text x="24" y="206">  LAN address  2001:db8:0:2e00::1 (br0)</text>
+  <text x="24" y="224">  Last check   <tspan class="green">routed</tspan> (2 min ago)</text>
+  <text x="24" y="242">  Last event   <tspan class="dim">2026-11-17 12:00:03 Daily check: 2001:db8:0:2e00::1 routed (router uptime 410h)</tspan></text>
+
+  <!-- Menu -->
+  <text x="24" y="278">  <tspan class="key">[1]</tspan> Check the prefix now</text>
+  <text x="24" y="296">  <tspan class="key">[2]</tspan> Show the log</text>
+  <text x="24" y="314">  <tspan class="key">[3]</tspan> Show the settings</text>
+  <text x="24" y="332">  <tspan class="key">[4]</tspan> Pause monitoring</text>
+  <text x="24" y="350">  <tspan class="key">[q]</tspan> Quit</text>
+
+  <!-- Prompt with a block cursor -->
+  <text x="24" y="386"><tspan class="bold">Choose:</tspan> █</text>
+</svg>
