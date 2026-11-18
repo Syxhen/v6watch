@@ -81,12 +81,12 @@ rm -rf v6watch
 ```
 
 The same commands upgrade an existing installation. A specific version is at
-`https://github.com/Syxhen/v6watch/releases/download/v0.3.0/v6watch.tar.gz`.
+`https://github.com/Syxhen/v6watch/releases/download/v0.4.0/v6watch.tar.gz`.
 
-Test versions are published as **pre-releases** (tags like `v0.4.0-beta.1`):
+Test versions are published as **pre-releases** (tags like `v0.5.0-beta.1`):
 the commands above never install them. To try one, replace `latest/download`
 with `download/<tag>`, for example
-`https://github.com/Syxhen/v6watch/releases/download/v0.4.0-beta.1/v6watch.tar.gz`,
+`https://github.com/Syxhen/v6watch/releases/download/v0.5.0-beta.1/v6watch.tar.gz`,
 and report problems in an issue. Running the commands above again goes back to
 the last stable version.
 
@@ -129,7 +129,7 @@ The same actions are available as commands, for scripts:
 
 ```sh
 /jffs/addons/v6watch.d/v6watch.sh menu     # the menu (the default from a terminal)
-/jffs/addons/v6watch.d/v6watch.sh check    # test now, print the result, change nothing
+/jffs/addons/v6watch.d/v6watch.sh check    # test now and print the result; no recovery, no log
 /jffs/addons/v6watch.d/v6watch.sh run      # what cron runs: test and recover if needed
 /jffs/addons/v6watch.d/v6watch.sh cron     # recreate the cron job (after changing the schedule)
 /jffs/addons/v6watch.d/v6watch.sh uncron   # remove the cron job until the next reboot
@@ -139,7 +139,7 @@ The same actions are available as commands, for scripts:
 Example output of `check`:
 
 ```
-v6watch 0.3.0
+v6watch 0.4.0
 LAN address: 2001:db8:0:2e00::1 (br0)
 WAN address: 2001:db8:ffff:1::2 (wan0)
   2606:4700:4700::1111: reply

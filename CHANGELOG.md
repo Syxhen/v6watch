@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-18
+
+v6watch finally has a face. Until now it was the quiet type: it lived in
+cron, did its job every five minutes and only ever spoke through log files,
+like a night guard who leaves notes on the fridge. Now type `v6watch` over
+SSH and it greets you with a banner, tells you how your prefix is doing and
+lets you poke at it with a single key. Same watchdog underneath, just with
+better manners. Editing the settings from the menu is coming in 0.5.0.
+
 ### Added
 - Interactive menu: `v6watch` over SSH shows whether the watchdog is running,
   the LAN address, the result of the last check and the last event, and lets
@@ -16,7 +25,8 @@ All notable changes to this project are documented here. The format follows
   `/jffs/configs/profile.add` (and removed by the uninstaller).
 - `v6watch.sh menu`; with no command, `v6watch.sh` opens the menu when started
   from a terminal and does a run otherwise, as before.
-- Every run records its result in `/tmp/v6watch.status` for the menu.
+- Every run, and every `check`, records its result in `/tmp/v6watch.status`
+  for the menu.
 
 ## [0.3.0] - 2026-11-17
 
@@ -89,7 +99,8 @@ First public version.
   ISP.
 - ShellCheck on every push (GitHub Actions).
 
-[Unreleased]: https://github.com/Syxhen/v6watch/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Syxhen/v6watch/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Syxhen/v6watch/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Syxhen/v6watch/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Syxhen/v6watch/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Syxhen/v6watch/releases/tag/v0.1.0
