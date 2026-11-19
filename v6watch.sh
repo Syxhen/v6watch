@@ -17,7 +17,7 @@
 # Copyright (C) 2026 Syxhen
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-VERSION=0.4.0
+VERSION=0.5.0-beta.1
 ADDON_DIR=/jffs/addons/v6watch.d
 CONF=${V6WATCH_CONF:-$ADDON_DIR/v6watch.conf}
 
@@ -32,6 +32,8 @@ DAY_FILE=/tmp/v6watch.day      # date (YYYYMMDD) of the last daily check entry
 STATUS_FILE=/tmp/v6watch.status  # result of the last check, for the menu
 LOCK_DIR=/tmp/v6watch.lock
 UPTIME_FILE=/proc/uptime
+# shellcheck disable=SC2034  # used by menu.sh
+NET_DIR=/sys/class/net   # where the menu looks for the interface names
 
 # Defaults; override them in $CONF
 LAN_IF=br0
@@ -57,12 +59,46 @@ for n in $SETTINGS; do
   eval "default_$n=\$$n"
 done
 
-# Settings that must be whole numbers, and those of them that must be at least 1
-NUMBERS="PING_COUNT PING_TIMEOUT RENEW_WAIT RESTART_WAIT FAIL_THRESHOLD RESTART_MIN_INTERVAL RESTART_MAX_INTERVAL LOG_LINES"
-POSITIVE="PING_COUNT PING_TIMEOUT FAIL_THRESHOLD LOG_LINES"
+# The rules of every setting: checked on the config at every start, and by the
+# menu before it saves a value. Each rule lists the characters it allows, so a
+# valid value can always be written back to $CONF between double quotes.
+# Numbers have no leading zeros: the shell would read 010 as octal
+valid_setting() {
+  case $1 in
+    PING_COUNT|PING_TIMEOUT|FAIL_THRESHOLD|LOG_LINES)   # 1 or more
+      case $2 in ''|0*|*[!0-9]*) return 1 ;; esac ;;
+    RENEW_WAIT|RESTART_WAIT|RESTART_MIN_INTERVAL|RESTART_MAX_INTERVAL)   # 0 or more
+      case $2 in 0) ;; ''|0*|*[!0-9]*) return 1 ;; esac ;;
+    RESTART_ON_WAN_FAIL)
+      case $2 in 0|1) ;; *) return 1 ;; esac ;;
+    DAILY_CHECK)   # HHMM, or empty for none
+      case $2 in ''|[01][0-9][0-5][0-9]|2[0-3][0-5][0-9]) ;; *) return 1 ;; esac ;;
+    LAN_IF)
+      case $2 in ''|*[!A-Za-z0-9._-]*) return 1 ;; esac ;;
+    TARGETS)   # IPv6 addresses or host names, separated by spaces
+      case $2 in *[!0-9A-Za-z.:\ -]*) return 1 ;; esac
+      case $2 in *[!\ ]*) ;; *) return 1 ;; esac ;;
+    CRON_SCHEDULE)   # the 5 time fields of a cron line
+      case $2 in *[!0-9*/,\ -]*) return 1 ;; esac
+      [ "$(printf '%s\n' "$2" | awk '{print NF}')" = 5 ] ;;
+    LOG_FILE|STATE_FILE)   # absolute paths
+      case $2 in /*) ;; *) return 1 ;; esac
+      case $2 in *[!A-Za-z0-9._/-]*) return 1 ;; esac ;;
+    *) return 1 ;;
+  esac
+}
 
-# shellcheck source=/dev/null
-[ -r "$CONF" ] && . "$CONF"
+# A syntax error in a sourced file (a quote left open, say) would stop the
+# script right here, and with it the watchdog: the file is checked first
+if [ -r "$CONF" ]; then
+  if sh -n "$CONF" 2>/dev/null; then
+    # shellcheck source=/dev/null
+    . "$CONF"
+  else
+    logger -t v6watch "Syntax error in $CONF, using the defaults"
+    [ -t 2 ] && echo "Warning: syntax error in $CONF, using the defaults (check it with: sh -n $CONF)" >&2
+  fi
+fi
 
 # A bad value in the config must not break the watchdog: warn and use the default
 bad_setting() {
@@ -71,17 +107,10 @@ bad_setting() {
   [ -t 2 ] && echo "Warning: invalid $1='$2' in $CONF, using $d" >&2
   eval "$1=\$d"
 }
-for n in $NUMBERS; do
+for n in $SETTINGS; do
   eval "v=\$$n"
-  case $v in ''|*[!0-9]*) bad_setting "$n" "$v"; continue ;; esac
-  case " $POSITIVE " in *" $n "*) [ "$v" -ge 1 ] || bad_setting "$n" "$v" ;; esac
+  valid_setting "$n" "$v" || bad_setting "$n" "$v"
 done
-case $RESTART_ON_WAN_FAIL in 0|1) ;; *) bad_setting RESTART_ON_WAN_FAIL "$RESTART_ON_WAN_FAIL" ;; esac
-case $DAILY_CHECK in
-  '') ;;
-  [01][0-9][0-5][0-9]|2[0-3][0-5][0-9]) ;;
-  *) bad_setting DAILY_CHECK "$DAILY_CHECK" ;;
-esac
 
 # Event: syslog and persistent log
 log() {
