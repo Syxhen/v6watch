@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Settings editor in the menu: option 3 lists the settings by number; pick one
+  to see what it does, its current value, its default and what it accepts,
+  then type a new value, Enter to keep it or `d` for the default. Only valid
+  values are saved, and a new `CRON_SCHEDULE` updates the cron job at once.
+  `LOG_FILE` and `STATE_FILE` are still changed only in the file.
+- Safe saving: the new config is written next to the old one, read back by
+  the shell to check the value, then renamed over it, so a power cut never
+  leaves it half written. The previous version is kept as `v6watch.conf.bak`.
+  Comments and other lines are left as they are, and a setting reset to its
+  default is commented out again.
+
+### Changed
+- One set of rules for every setting, used both on the config file at every
+  start and by the menu. New checks: `TARGETS` (addresses or host names
+  separated by spaces), `CRON_SCHEDULE` (5 fields), `LAN_IF`, `LOG_FILE` and
+  `STATE_FILE`. Numbers with a leading zero, like `030`, are now invalid: the
+  shell would read them as octal. An invalid value is replaced by its default
+  and reported, as before.
+
+### Fixed
+- A syntax error in `v6watch.conf`, such as a quote left open, stopped the
+  script before it could do anything, cron runs included, so the watchdog was
+  silently off. The file is now checked first: with an error v6watch reports
+  it and runs with the defaults.
+
 ## [0.4.0] - 2026-11-18
 
 v6watch finally has a face. Until now it was the quiet type: it lived in

@@ -69,6 +69,7 @@ reset() {
   echo "$WAN" > "$SC/wan"
   printf '%s\n%s\n' "$LAN" "$WAN" > "$SC/good"
   echo "$NOW.42 345678.90" > "$SC/uptime"
+  mkdir -p "$SC/net/br0" "$SC/net/eth1"
   cat > "$SC/conf" <<EOF
 LOG_FILE=$SC/log
 STATE_FILE=$SC/state
@@ -80,6 +81,7 @@ LOCK_DIR=$SC/lock
 DAY_FILE=$SC/daily
 STATUS_FILE=$SC/status
 UPTIME_FILE=$SC/uptime
+NET_DIR=$SC/net
 RENEW_WAIT=0
 RESTART_WAIT=0
 DAILY_CHECK=
@@ -266,6 +268,29 @@ scenarios() {
   ok "defaults used: no restart at check 1" "$(restarts)" 0
   run
   ok "defaults used: restart at check 2" "$(restarts)" 1
+  reset
+  printf 'PING_TIMEOUT=03
+CRON_SCHEDULE="*/5 * *"
+TARGETS="2001:db8::1,2001:db8::2"
+LAN_IF="br0; reboot"
+' >> "$SC/conf"
+  run
+  has "leading zero reported" syslog "Invalid PING_TIMEOUT='03'"
+  has "short cron schedule reported" syslog "Invalid CRON_SCHEDULE='*/5 * *'"
+  has "targets with a comma reported" syslog "Invalid TARGETS='2001:db8::1,2001:db8::2'"
+  has "odd interface name reported" syslog "Invalid LAN_IF='br0; reboot'"
+  ok "and the defaults work" "$(renews)$(restarts)" 00
+  reset; printf 'TARGETS="2001:db8::1  one.one.one.one"
+CRON_SCHEDULE="0,30 1-5 * * 1"
+RENEW_WAIT=0
+' >> "$SC/conf"; run
+  ok "valid unusual values accepted" "$(grep -c Invalid "$SC/syslog")" 0
+
+  echo "syntax error in the config"
+  # Only "version", which writes nothing: the test paths are in the broken file too
+  reset; echo 'TARGETS="2001:db8::1' >> "$SC/conf"
+  ok "the script still starts" "$(v6 version)" "v6watch $(sed -n 's/^VERSION=//p' "$SCRIPT")"
+  has "and says why it uses the defaults" syslog "Syntax error in $SC/conf, using the defaults"
 
   echo "check command"
   reset
@@ -334,6 +359,84 @@ scenarios() {
   ok "option 3 marks a changed setting" "$(printf '%s\n' "$out" | grep FAIL_THRESHOLD | grep -c "(default: 2)")" 1
   ok "and not an unchanged one" "$(printf '%s\n' "$out" | grep PING_COUNT | grep -c "(default:")" 0
   contains "unchanged ones are listed too" "$out" "PING_COUNT"
+
+  echo "settings editor"
+  # The shipped config under the test lines: the editor must keep its comments
+  reset; cat "$ROOT/v6watch.conf" >> "$SC/conf"; cp "$SC/conf" "$SC/orig"
+  out=$(menu 3 7 3 '' q)
+  contains "asks with the help" "$out" "FAIL_THRESHOLD - consecutive failed checks before a WAN restart"
+  contains "shows current and default" "$out" "Current: 2   Default: 2"
+  contains "saved" "$out" "Saved: FAIL_THRESHOLD = 3"
+  ok "active line under the commented one" "$(grep -A1 '^#FAIL_THRESHOLD=2' "$SC/conf" | tail -n 1)" "FAIL_THRESHOLD=3"
+  ok "the list after it shows the new value" "$(printf '%s\n' "$out" | grep FAIL_THRESHOLD | grep -c "3  (default: 2)")" 1
+  ok "backup of the previous file" "$(cmp -s "$SC/conf.bak" "$SC/orig" && echo same)" same
+  ok "no temporary file left" "$(exists conf.new)" no
+  prefix_dead; run; run
+  ok "the watchdog uses it: no restart at check 2" "$(restarts)" 0
+  run
+  ok "restart at check 3" "$(restarts)" 1
+  menu 3 7 5 '' q >/dev/null
+  ok "replaced, not added" "$(grep -c '^FAIL_THRESHOLD=' "$SC/conf")" 1
+  ok "with the new value" "$(grep '^FAIL_THRESHOLD=' "$SC/conf")" "FAIL_THRESHOLD=5"
+  out=$(menu 3 7 d '' q)
+  contains "back to the default" "$out" "Saved: FAIL_THRESHOLD = 2"
+  ok "the file is the shipped one again, byte for byte" "$(cmp -s "$SC/conf" "$SC/orig" && echo same)" same
+
+  out=$(menu 3 2 '2001:db8::1 2001:db8::2' '' q)
+  ok "values with spaces are quoted" "$(grep '^TARGETS=' "$SC/conf")" 'TARGETS="2001:db8::1 2001:db8::2"'
+  contains "and read back" "$(menu 3 '' q)" '2001:db8::1 2001:db8::2  (default:'
+  menu 3 2 d '' q >/dev/null
+
+  out=$(menu 3 3 two 0 07 '' '' q)
+  ok "invalid values refused, asked again" "$(count "$out" "Not valid: a whole number, 1 or more")" 3
+  contains "Enter keeps the value" "$out" "Unchanged."
+  ok "file untouched" "$(cmp -s "$SC/conf" "$SC/orig" && echo same)" same
+  menu 3 2 '$(touch "$SC/pwned")' '`touch $SC/pwned`' 'a"b' '' '' q >/dev/null
+  ok "shell code refused" "$(exists pwned)" no
+  ok "file still untouched" "$(cmp -s "$SC/conf" "$SC/orig" && echo same)" same
+  out=$(menu 3 1 eth9 eth1 '' q)
+  contains "unknown interface refused" "$out" "There is no interface named eth9"
+  ok "known one saved" "$(grep '^LAN_IF=' "$SC/conf")" "LAN_IF=eth1"
+  out=$(menu 3 99 x '' q)
+  ok "no such number" "$(count "$out" "There is no setting number")" 2
+  out=$(menu 3 '' q)
+  contains "read-only paths listed" "$out" "LOG_FILE"
+  ok "and not numbered" "$(printf '%s\n' "$out" | grep LOG_FILE | grep -c '\[')" 0
+
+  echo "settings editor: odd config files"
+  reset; sed -i '/^DAILY_CHECK=/d' "$SC/conf"
+  menu 3 11 off '' q >/dev/null
+  ok "DAILY_CHECK off: an empty value" "$(grep '^DAILY_CHECK' "$SC/conf")" "DAILY_CHECK="
+  ok "added at the end, no commented line to go under" "$(tail -n 1 "$SC/conf")" "DAILY_CHECK="
+  menu 3 11 d '' q >/dev/null
+  ok "reset without a commented line leaves one" "$(grep '^#*DAILY_CHECK' "$SC/conf")" "#DAILY_CHECK=1200"
+  printf 'PING_COUNT=4\nPING_COUNT=5\n' >> "$SC/conf"
+  menu 3 3 6 '' q >/dev/null
+  ok "duplicates merged into one line" "$(grep -c '^PING_COUNT=' "$SC/conf")" 1
+  ok "with the new value" "$(grep '^PING_COUNT=' "$SC/conf")" "PING_COUNT=6"
+  printf '  RESTART_WAIT=5  # mine\n' >> "$SC/conf"
+  menu 3 6 7 '' q >/dev/null
+  ok "indented lines found too" "$(grep -c 'RESTART_WAIT=' "$SC/conf")" 1
+  rm -f "$SC/conf.bak"; echo 'true && PING_COUNT=9' >> "$SC/conf"; cp "$SC/conf" "$SC/orig"
+  out=$(menu 3 3 2 '' q)
+  contains "a later line that would undo it: not saved" "$out" "Could not save"
+  ok "file untouched" "$(cmp -s "$SC/conf" "$SC/orig" && echo same)" same
+  ok "no backup either" "$(exists conf.bak)$(exists conf.new)" nono
+  reset; printf '3\n7\n' | v6 menu >/dev/null; rc=$?
+  ok "end of input while editing quits" "$rc" 0
+
+  echo "settings editor: the cron schedule"
+  reset; menu 4 '' q >/dev/null
+  out=$(menu 3 12 '*/10 * * * *' '' q)
+  contains "the cru job follows" "$out" "The cru job now runs at: */10 * * * *"
+  has "cru job updated" cron "*/10 * * * * "
+  ok "saved quoted" "$(grep '^CRON_SCHEDULE=' "$SC/conf")" 'CRON_SCHEDULE="*/10 * * * *"'
+  contains "status panel shows it" "$(menu q)" 'ON (*/10 * * * *)'
+  menu 4 '' q >/dev/null
+  menu 3 12 d '' q >/dev/null
+  ok "paused: the job is not created" "$(lines cron)" 0
+  out=$(menu 3 12 '*/10 * *' '' '' q)
+  contains "short schedule refused" "$out" "Not valid: 5 cron fields"
 
   reset; rm -f "$SC/log"
   contains "empty log" "$(menu 2 '' q)" "The log is empty"

@@ -132,18 +132,18 @@ Over SSH, type `v6watch` to open the menu:
   Monitoring   ON, every 5 minutes
   LAN address  2001:db8:0:2e00::1 (br0)
   Last check   routed (2 min ago)
-  Last event   2026-11-17 12:00:03 Daily check: 2001:db8:0:5a00::1 routed (router uptime 410h)
+  Last event   2026-11-17 12:00:03 Daily check: 2001:db8:0:2e00::1 routed (router uptime 410h)
 
   [1] Check the prefix now
   [2] Show the log
-  [3] Show the settings
+  [3] Settings
   [4] Pause monitoring
   [q] Quit
 ```
 
 It shows whether the watchdog is running and what the last check found, and
-lets you test the prefix, read the log (colored by event), see which settings
-you changed and pause or resume the monitoring. Colors are used only on a
+lets you test the prefix, read the log (colored by event), change the settings
+and pause or resume the monitoring. Colors are used only on a
 terminal, and never with `NO_COLOR` set. The installer adds the `v6watch`
 command to `/jffs/configs/profile.add`; it works from the next SSH login.
 
@@ -193,11 +193,20 @@ so a WAN restart does not reset it.
 
 ## Configuration
 
-Edit `/jffs/addons/v6watch.d/v6watch.conf`. Every setting is commented out and
-shows its default; uncomment a line to change it. Changes apply at the next
-run, except `CRON_SCHEDULE`, which needs `v6watch.sh cron`. An invalid value
-(for example a letter in a number) is reported in syslog, and by `check`, and
-replaced by its default.
+Settings live in `/jffs/addons/v6watch.d/v6watch.conf`. The easy way to change
+them is option `[3]` of the menu: pick a setting by its number and it shows
+what the setting does, its current value and default, and what it accepts. A
+value is saved only if it is valid, `d` puts the default back, and changes
+apply from the next check; a new `CRON_SCHEDULE` updates the cron job at once.
+Every save keeps the previous file as `v6watch.conf.bak`. The two paths,
+`LOG_FILE` and `STATE_FILE`, are changed only by editing the file.
+
+You can also edit the file by hand: every setting is commented out and shows
+its default; uncomment a line to change it (after a new `CRON_SCHEDULE`, run
+`v6watch.sh cron`). An invalid value (for example a letter in a number) is
+reported in syslog, and by `check`, and replaced by its default. A syntax
+error, such as a quote left open, makes v6watch ignore the whole file and use
+the defaults until it is fixed: `sh -n v6watch.conf` shows where it is.
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -270,7 +279,7 @@ Only the v6watch lines are removed from `/jffs/scripts/services-start` and
 
 ## Roadmap
 
-- Settings edited from the menu, with a first-run setup and updates.
+- Updates from the menu, and a first-run setup.
 - Notifications (for example Telegram) when a prefix stops working.
 - Guest network support.
 - OpenWrt port (it uses the same `odhcp6c`).
